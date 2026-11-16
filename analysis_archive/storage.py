@@ -22,6 +22,19 @@ SCHEMA = (
        payload TEXT NOT NULL, receipt TEXT NOT NULL UNIQUE)""",
 )
 
+# Fixed two-stage plans live in their own namespace and tables. They are added
+# transparently when an older version-one archive is opened, so legacy data,
+# tasks and receipts remain byte-for-byte untouched.
+STAGED_SCHEMA = (
+    """CREATE TABLE staged_tasks(
+       task_id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE,
+       binding TEXT NOT NULL, plan TEXT NOT NULL, parameters TEXT NOT NULL,
+       status TEXT NOT NULL CHECK(status IN ('pending','succeeded')))""",
+    """CREATE TABLE staged_results(
+       task_id INTEGER PRIMARY KEY REFERENCES staged_tasks(task_id),
+       payload TEXT NOT NULL, receipt TEXT NOT NULL UNIQUE)""",
+)
+
 
 class Store:
     """Single-worker SQLite owner; transaction is also available to storage adapters."""
@@ -38,6 +51,11 @@ class Store:
                         db.execute(statement)
                 elif "archive_meta" not in tables:
                     raise ArchiveError("not an analysis archive")
+                # Add the fixed two-stage tables to legacy archives in place.
+                # Existing version-one rows and schema objects are never altered.
+                if "staged_tasks" not in tables:
+                    for statement in STAGED_SCHEMA:
+                        db.execute(statement)
                 row = db.execute("SELECT value FROM archive_meta WHERE key='format'").fetchone()
                 if row is None or row[0] != "1":
                     raise ArchiveError("unsupported archive format")

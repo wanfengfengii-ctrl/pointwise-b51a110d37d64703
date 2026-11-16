@@ -4,6 +4,9 @@ from .cohorts import Cohorts
 from .tasks import Tasks
 from .results import Results
 from .analysis import Analysis
+from .staged_tasks import StagedTasks
+from .staged_results import StagedResults
+from .staged_analysis import StagedAnalysis
 from .errors import ArchiveError, ValidationError, NotFound, RequestConflict, ResultNotReady
 
 __all__ = ["Archive", "ArchiveError", "ValidationError", "NotFound", "RequestConflict", "ResultNotReady"]
@@ -17,6 +20,10 @@ class Archive:
         self.tasks = Tasks(self.store, self.models)
         self.results = Results(self.store, self.tasks)
         self.analysis = Analysis(self.store, self.models, self.tasks, self.results)
+        self.staged_tasks = StagedTasks(self.store, self.models)
+        self.staged_results = StagedResults(self.store, self.staged_tasks)
+        self.staged_analysis = StagedAnalysis(
+            self.store, self.models, self.staged_tasks, self.staged_results)
 
     def put_model(self, model_id, definition):
         return self.models.put_model(model_id, definition)
@@ -47,6 +54,18 @@ class Archive:
 
     def get_result(self, task_id):
         return self.results.get_result(task_id)
+
+    def create_staged_task(self, request_id, stages, initial):
+        return self.staged_tasks.create_staged_task(request_id, stages, initial)
+
+    def get_staged_task(self, task_id):
+        return self.staged_tasks.get_staged_task(task_id)
+
+    def run_staged_task(self, task_id, *, fault=None):
+        return self.staged_analysis.run_staged_task(task_id, fault=fault)
+
+    def get_staged_result(self, task_id):
+        return self.staged_results.get_staged_result(task_id)
 
     def close(self):
         self.store.close()

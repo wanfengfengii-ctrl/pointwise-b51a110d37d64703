@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 from . import Archive, ResultNotReady
 from .samples import build_legacy
+import staged_examples
 
 
 def demo():
@@ -33,11 +34,15 @@ def demo():
             retried = archive.run_task(ids["pending"])
             assert archive.run_task(ids["pending"]) == retried
             assert archive.get_result(ids["completed"]) == original
+            # Fixed two-stage plan: correct the same model after binding, then
+            # reopen and execute the frozen plan against its pinned revisions.
+            staged = staged_examples.demo()
             return {"historical": original, "revised": archive.get_result(ids["revised"]),
                     "stopping": archive.get_result(ids["stopping"]),
                     "parallel": archive.get_result(ids["mixed"]),
                     "retry": retried, "failure_published_result": False,
-                    "task_count": archive.store.connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]}
+                    "task_count": archive.store.connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
+                    "staged": staged}
 
 
 def main(argv=None):
